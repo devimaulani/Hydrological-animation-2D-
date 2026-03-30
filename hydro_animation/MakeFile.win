@@ -1,0 +1,17 @@
+CC = gcc
+
+CFLAGS = -I. -I"C:/raylib/include"
+LDFLAGS = -L"C:/raylib/lib" -lraylib -lopengl32 -lgdi32 -lwinmm -lm
+
+TARGET = hydrological_cycle.exe
+
+SRCS = main.c coords.c $(shell find src -name "*.c")
+
+all:
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS) $(LDFLAGS)
+
+run: all
+	./$(TARGET)
+
+clean:
+	rm -f $(TARGET)
