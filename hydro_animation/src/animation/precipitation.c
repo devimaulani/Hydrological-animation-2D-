@@ -3,6 +3,8 @@
 #include "../wrapper/draw_circle.h"
 #include "coords.h"
 #include "../animation/advection.h"
+#include "../animation/evaporation.h"
+#include "../simulation/simulation_state.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -51,7 +53,11 @@ void InitRain() {
 
 // =========================
 void UpdateRain(float dt) {
-    for (int i = 0; i < RAIN_COUNT; i++) {
+    // Dinamis: jumlah tetesan yang diproses sesuai tingginya angka penguapan
+    int activeRainCount = (int)(RAIN_COUNT * (evaporationRate / 2.0f));
+    if (activeRainCount > RAIN_COUNT) activeRainCount = RAIN_COUNT;
+
+    for (int i = 0; i < activeRainCount; i++) {
 
         // Y berkurang = jatuh ke bawah (koordinat dunia nyata)
         rain[i].y -= rain[i].speed * dt;
@@ -138,7 +144,11 @@ static void DrawDrop(int cx, int cy, float s) {
 
 // =========================
 void DrawRain() {
-    for (int i = 0; i < RAIN_COUNT; i++) {
+    // Hitung ulang untuk sinkronisasi render
+    int activeRainCount = (int)(RAIN_COUNT * (evaporationRate / 2.0f));
+    if (activeRainCount > RAIN_COUNT) activeRainCount = RAIN_COUNT;
+
+    for (int i = 0; i < activeRainCount; i++) {
         DrawDrop((int)rain[i].x, (int)rain[i].y, rain[i].size);
     }
 }

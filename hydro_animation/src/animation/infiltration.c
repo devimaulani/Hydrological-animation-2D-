@@ -1,135 +1,110 @@
 #include "infiltration.h"
 #include "../objects/lake.h"
 #include "../wrapper/draw_line.h"
+#include "../wrapper/draw_ellipse.h"
 #include "coords.h"
 #include <stdlib.h>
 #include <math.h>
 
 // =========================================================
-// INFILTRATION MODULE - Penyerapan Air ke Bawah Tanah
-//
-// Partikel air muncul dari bawah danau organik,
-// lalu meresap ke bawah tanah secara vertikal.
-//
-// ALUR:
-//   [LAKE_BOTTOM_Y]  ← spawn di dasar danau
-//        |
-//        v  (turun, makin pudar)
-//        |
-//   [INFIL_END_Y]    ← menghilang di dalam tanah
-//        |
-//   → reset ke dasar danau
+// INFILTRATION MODULE - Jalur Aliran Resapan Berakar
+// Menyelesaikan masalah "kotak-kotak" dengan menggambar lintasan utuh
+// yang terus terlihat namun warna / intensitas alirannya berdenyut turun.
 // =========================================================
 
-// Kedalaman maksimum partikel meresap
-#define INFIL_END_Y      (BOTTOM + 50)
-
-// -------------------------
-// KONFIGURASI PARTIKEL
-// -------------------------
-#define PARTICLE_COUNT   30
-#define PARTICLE_SPEED   40.0f
-#define SPEED_VARIANCE   15
+#define VEIN_COUNT     6
+#define VEIN_SEGMENTS  30
 
 typedef struct {
     float x;
     float y;
-    float speed;
-    float alpha;
-} Particle;
+} VeinNode;
 
-static Particle particles[PARTICLE_COUNT];
+typedef struct {
+    VeinNode nodes[VEIN_SEGMENTS];
+} Vein;
 
+static Vein veins[VEIN_COUNT];
+static int soilTop;
+static int aquiferTop;
 
-// =========================================================
-// FUNGSI INTERNAL
-// =========================================================
-
-// Spawn X acak di bawah area danau organik
-// Menggunakan radius horizontal danau sebagai batas
-static float RandomXInsideLake() {
-    // Sedikit lebih sempit dari radius agar tidak keluar blob
-    int range = (int)(LAKE_RADIUS_X * 1.2f);
-    return (float)(LAKE_CENTER_X - range + rand() % (range * 2));
+static float RandomRiverX() {
+    int minX = LEFT + 230;
+    int maxX = 50;  // Batasi agar tidak muncul di tepian yang sudah dimundurkan
+    int range = maxX - minX;
+    return (float)(minX + (rand() % range));
 }
 
-// Alpha berkurang seiring kedalaman (efek meresap & menghilang)
-static float CalcAlpha(float y) {
-    float totalRange = (float)(LAKE_BOTTOM_Y - INFIL_END_Y);
-    if (totalRange <= 0.0f) return 1.0f;
-    float progress = (LAKE_BOTTOM_Y - y) / totalRange;
-    if (progress < 0.0f) progress = 0.0f;
-    if (progress > 1.0f) progress = 1.0f;
-    return 1.0f - progress * 0.88f;
-}
-
-// Reset partikel ke dasar danau
-static void ResetParticle(int i) {
-    particles[i].x     = RandomXInsideLake();
-    particles[i].y     = (float)LAKE_BOTTOM_Y;
-    particles[i].speed = PARTICLE_SPEED
-                         + (rand() % SPEED_VARIANCE)
-                         - (SPEED_VARIANCE / 2);
-    particles[i].alpha = 1.0f;
-}
-
-
-// =========================================================
-// INIT
-// Sebar partikel acak di sepanjang jalur agar
-// animasi tidak mulai serentak dari atas semua.
-// =========================================================
 void InitInfiltration() {
+    soilTop = BOTTOM + 180; 
+    // Mengikuti batas aquifer tebal yang Anda tetapkan 
+    aquiferTop = BOTTOM + 160; 
 
-    float totalRange = (float)(LAKE_BOTTOM_Y - INFIL_END_Y);
-
-    for (int i = 0; i < PARTICLE_COUNT; i++) {
-        ResetParticle(i);
-
-        // Posisi awal acak di sepanjang jalur infiltrasi
-        float offset   = (float)(rand() % (int)totalRange);
-        particles[i].y = (float)LAKE_BOTTOM_Y - offset;
-        particles[i].alpha = CalcAlpha(particles[i].y);
-    }
-}
-
-
-// =========================================================
-// UPDATE
-// =========================================================
-void UpdateInfiltration(float dt) {
-
-    for (int i = 0; i < PARTICLE_COUNT; i++) {
-
-        // Gerak ke bawah
-        particles[i].y -= particles[i].speed * dt;
-
-        // Pudar sesuai kedalaman
-        particles[i].alpha = CalcAlpha(particles[i].y);
-
-        // Reset jika sudah mencapai kedalaman maksimum
-        if (particles[i].y <= (float)INFIL_END_Y) {
-            ResetParticle(i);
+    for (int v = 0; v < VEIN_COUNT; v++) {
+        float cx = RandomRiverX();
+        float cy = (float)soilTop;
+        
+        float depthRange = (float)(soilTop - aquiferTop);
+        float stepY = depthRange / (VEIN_SEGMENTS - 1);
+        
+        for (int i = 0; i < VEIN_SEGMENTS; i++) {
+            veins[v].nodes[i].x = cx;
+            veins[v].nodes[i].y = cy;
+            
+            // Memberikan rute acak/zigzag terbatas agar tetap di dalam tanah
+            cx += (float)((rand() % 11) - 5.5f);
+            cy -= stepY;
         }
     }
 }
 
+void UpdateInfiltration(float dt) {
+    // Jalurnya statis permanen bagai pembuluh, animasinya terjadi secara visual di fungsi Draw
+}
 
-// =========================================================
-// DRAW
-// Partikel digambar sebagai garis vertikal pendek
-// yang makin pudar semakin dalam.
-// =========================================================
+extern double GetTime(void);
+
 void DrawInfiltration() {
+    float time = (float)GetTime();
 
-    for (int i = 0; i < PARTICLE_COUNT; i++) {
+    for (int v = 0; v < VEIN_COUNT; v++) {
+        for (int i = 0; i < VEIN_SEGMENTS - 1; i++) {
+            // Animasi denyut (pulse) merambat turun
+            float phase = (time * 5.0f) - (i * 0.35f);
+            float pulse = (sinf(phase) + 1.0f) / 2.0f; 
+            
+            // Makin ke bawah makin redup alaminya
+            int baseAlpha = 220 - (i * 4);
+            if (baseAlpha < 20) baseAlpha = 20;
 
-        unsigned char a = (unsigned char)(particles[i].alpha * 210);
-        Color color     = (Color){ 80, 150, 230, a };
+            // Mode "kering" atau "remang" saat tidak ada tetesan air melewatinya
+            Color c = (Color){50, 110, 170, (unsigned char)(baseAlpha * 0.3f)};
+            int thickness = 2;
+            
+            // Mode "basah/dilewati air" saat denyut (pulse) aliran bergerak menimpanya
+            if (pulse > 0.75f) {
+                c = (Color){80, 180, 255, (unsigned char)baseAlpha}; 
+                thickness = 4; // Terlihat lebih nyata dan menonjol
+            }
+            
+            // Gambar urat urat tanah secara bersambung
+            Wrapper_DrawLineThick(
+                (int)veins[v].nodes[i].x, (int)veins[v].nodes[i].y, 
+                (int)veins[v].nodes[i+1].x, (int)veins[v].nodes[i+1].y, 
+                thickness, c
+            );
 
-        int x = (int)particles[i].x;
-        int y = (int)particles[i].y;
-
-        Wrapper_DrawLineThick(x, y, x, y - 7, 2, color);
+            // Pada ujung node (batas aquifer), gambar efek genangan melebar perlahan
+            if (i == VEIN_SEGMENTS - 2 && pulse > 0.4f) {
+                float intensity = pulse - 0.4f; // 0.0 -> 0.6
+                Wrapper_DrawEllipseFilled(
+                    (int)veins[v].nodes[i+1].x, 
+                    (int)veins[v].nodes[i+1].y, 
+                    (int)(30.0f * intensity),   // Melebar ke samping 
+                    (int)(6.0f * intensity),   // Sangat tipis membentuk genangan
+                    c
+                );
+            }
+        }
     }
 }

@@ -4,19 +4,19 @@
 #include "../simulation/simulation_state.h"
 #include <math.h>
 
-#define BASE_Y  (-HALF_H / 3)
+#define BASE_Y  (-HALF_H / 4)
 #define CLOUD_Y (TOP - 200)
 
-#define COUNT 4
-#define X_START (LEFT + 630)
-#define X_GAP   25
+#define COUNT 3
+#define X_START (LEFT + 670) // Difokuskan hanya di kerumunan 3 pohon paling kanan (zona pesisir)
+#define X_GAP   45           // Jarak dirapatkan antar pohon kanan
 
-#define LINE_THICK 2
-#define BASE_SPEED 40.0f
+#define BASE_SPEED 45.0f
 
 typedef struct {
     float x;
     float y;
+    float phase; // Fase dinamis asimetris
 } Transp;
 
 static Transp t[COUNT];
@@ -24,7 +24,8 @@ static Transp t[COUNT];
 void InitTranspiration() {
     for (int i = 0; i < COUNT; i++) {
         t[i].x = X_START + i * X_GAP;
-        t[i].y = BASE_Y;
+        t[i].y = GetRandomValue(BASE_Y, CLOUD_Y); // Acak elevasi agar natural
+        t[i].phase = GetRandomValue(0, 314) / 100.0f;
     }
 }
 
@@ -39,27 +40,33 @@ void UpdateTranspiration(float dt) {
     }
 }
 
-static void DrawWave(int baseX, float startY) {
+static void DrawWave(float xBase, float yBase, float phase) {
+    Color color = (Color){200, 255, 200, 180}; // Hijau keputihan untuk uap daun
+    float amplitude = 6.0f;
+    float frequency = 0.05f;
+    float step = 3.0f;
+    float length = 70.0f;
 
-    Color color = (Color){200,255,200,180};
-
-    float amplitude = 5.0f;
-    float frequency = 0.08f;
-    float step = 2.0f;
-
-    for (float y = startY; y < CLOUD_Y; y += step) {
-
-        float offset = amplitude * sinf(y * frequency);
-        int x = (int)(baseX + offset);
-
-        for (int t = -LINE_THICK/2; t <= LINE_THICK/2; t++) {
-            Wrapper_DrawLine(x+t, (int)y, x+t, (int)(y+step), color);
-        }
+    for (float dy = 0; dy < length; dy += step) {
+        // Efek transparan/fade di pangkal dan ujung
+        float alphaFactor = 1.0f - fabsf(dy - (length / 2.0f)) / (length / 2.0f);
+        if (alphaFactor < 0.0f) alphaFactor = 0.0f;
+        unsigned char alpha = (unsigned char)(180 * alphaFactor);
+        
+        float currentY = yBase + dy;
+        float waktu = GetTime() * 1.5f;
+        
+        // Gelombang bergerak dan mendayu sesuai waktu
+        float offset = amplitude * sinf(currentY * frequency + phase + waktu);
+        float nextOffset = amplitude * sinf((currentY + step) * frequency + phase + waktu);
+        
+        Color renderColor = (Color){color.r, color.g, color.b, alpha};
+        Wrapper_DrawLineThick((int)(xBase + offset), (int)currentY, (int)(xBase + nextOffset), (int)(currentY + step), 3, renderColor);
     }
 }
 
 void DrawTranspiration() {
     for (int i = 0; i < COUNT; i++) {
-        DrawWave((int)t[i].x, t[i].y);
+        DrawWave(t[i].x, t[i].y, t[i].phase);
     }
 }
