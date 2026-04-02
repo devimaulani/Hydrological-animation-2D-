@@ -1,135 +1,72 @@
 #include "../objects/lake.h"
-#include "../wrapper/draw_ellipse.h"
 #include "../wrapper/draw_line.h"
+#include "../wrapper/draw_ellipse.h"
 #include "coords.h"
+#include <math.h>
 
 // =========================================================
-// LAKE MODULE - Danau Organik + Aliran Sungai ke Laut
+// RIVER MODULE (Pengganti Lake) - Sungai Bentuk Natural
+// Menggunakan lingkaran-lingkaran kecil yang menumpuk untuk
+// menggambar garis halus tanpa patahan sudut kotak.
 // =========================================================
 
+#define RIVER_SEGMENTS 120
 
-// =========================================================
-// BAGIAN 1: DANAU ORGANIK
-// =========================================================
+typedef struct { float x; float y; } RiverPoint;
+static RiverPoint riverPoints[RIVER_SEGMENTS];
 
-typedef struct {
-    int dx;   // offset X dari LAKE_CENTER_X
-    int dy;   // offset Y dari LAKE_CENTER_Y
-    int rx;   // jari-jari horizontal
-    int ry;   // jari-jari vertikal
-} EllipsPart;
-
-// Semua rx/ry diperbesar proporsional mengikuti radius baru (110, 50)
-static const EllipsPart LAKE_PARTS[] = {
-//   dx    dy    rx    ry
-    {  0,   0,  110,  46 },   // badan utama
-    {-62,  12,   62,  28 },   // tonjolan kiri
-    { 60,  -7,   60,  25 },   // tonjolan kanan
-    {-12, -22,   78,  25 },   // tonjolan atas
-    { 15,  22,   70,  22 },   // tonjolan bawah
-};
-
-#define LAKE_PARTS_COUNT 5
-
-static const Color COLOR_LAKE_FILL   = {  80, 155, 225, 200 };
-static const Color COLOR_LAKE_SHADOW = {  55, 115, 190, 160 };
-static const Color COLOR_LAKE_SHINE  = { 170, 220, 255, 110 };
-
-static void DrawLakeBody() {
-
-    // Pass 1: shadow (kesan kedalaman)
-    for (int i = 0; i < LAKE_PARTS_COUNT; i++) {
-        int cx = LAKE_CENTER_X + LAKE_PARTS[i].dx;
-        int cy = LAKE_CENTER_Y + LAKE_PARTS[i].dy - 4;
-        Wrapper_DrawEllipseFilled(cx, cy,
-                                  LAKE_PARTS[i].rx + 4,
-                                  LAKE_PARTS[i].ry + 3,
-                                  COLOR_LAKE_SHADOW);
-    }
-
-    // Pass 2: badan utama
-    for (int i = 0; i < LAKE_PARTS_COUNT; i++) {
-        int cx = LAKE_CENTER_X + LAKE_PARTS[i].dx;
-        int cy = LAKE_CENTER_Y + LAKE_PARTS[i].dy;
-        Wrapper_DrawEllipseFilled(cx, cy,
-                                  LAKE_PARTS[i].rx,
-                                  LAKE_PARTS[i].ry,
-                                  COLOR_LAKE_FILL);
-    }
-
-    // Pass 3: highlight permukaan
-    Wrapper_DrawEllipseFilled(LAKE_CENTER_X - 22,
-                              LAKE_CENTER_Y + 15,
-                              42, 13,
-                              COLOR_LAKE_SHINE);
-}
-
-
-// =========================================================
-// BAGIAN 2: ALIRAN SUNGAI (DANAU → LAUT)
-//
-// Titik [0] = sisi kanan danau:
-//   LAKE_CENTER_X + LAKE_RADIUS_X = (LEFT+370) + 110 = LEFT+480
-//   Y = LAKE_CENTER_Y             = BOTTOM+260
-//
-// Dari sana sungai mengalir ke kanan sambil turun
-// mengikuti gravitasi menuju laut (tepi kanan layar).
-// =========================================================
-
-typedef struct { int x; int y; } Point2D;
-
-static const Point2D RIVER_PATH[] = {
-    // [0] keluar dari sisi kanan danau
-    { LEFT + 480,  BOTTOM + 255 },
-
-    // [1] turun sedikit, belok kanan
-    { LEFT + 545,  BOTTOM + 238 },
-
-    // [2] lekukan ke bawah (natural)
-    { LEFT + 615,  BOTTOM + 218 },
-
-    // [3] lekukan ke atas sedikit
-    { LEFT + 695,  BOTTOM + 205 },
-
-    // [4] turun lagi mengikuti kontur
-    { LEFT + 775,  BOTTOM + 190 },
-
-    // [5] mulai mendekati laut
-    { LEFT + 860,  BOTTOM + 175 },
-
-    // [6] hampir sampai tepi
-    { LEFT + 940,  BOTTOM + 165 },
-
-    // [7] sampai laut (tepi kanan layar)
-    { RIGHT,       BOTTOM + 155 },
-};
-
-#define RIVER_POINT_COUNT 8
-
-static const Color COLOR_RIVER_EDGE = { 50,  110, 190, 130 };
-static const Color COLOR_RIVER_CORE = { 80,  155, 225, 200 };
-
-static void DrawRiverSegment(Point2D a, Point2D b) {
-    Wrapper_DrawLineThick(a.x, a.y, b.x, b.y, 8, COLOR_RIVER_EDGE);
-    Wrapper_DrawLineThick(a.x, a.y, b.x, b.y, 5, COLOR_RIVER_CORE);
-}
-
-static void DrawRiver() {
-    for (int i = 0; i < RIVER_POINT_COUNT - 1; i++) {
-        DrawRiverSegment(RIVER_PATH[i], RIVER_PATH[i + 1]);
-    }
-}
-
-
-// =========================================================
-// INTERFACE PUBLIK
-// =========================================================
+static const Color RIV_BLUE_DARK  = { 40,  120, 200, 220 };
+static const Color RIV_BLUE_LIGHT = { 80,  160, 240, 240 };
+static const Color RIV_RIPPLE     = { 180, 220, 255, 230 };
 
 void InitLake() {
-    // Danau statis — tidak ada state yang perlu diinisialisasi.
+    float startX = LEFT + 50; 
+    float startY = -112; 
+    
+    // Hitung posisi bibir pantai (shoreline) secara dinamis agar sungai menyatu sempurna
+    int landTop = (int)(-HALF_H / 4.2f);
+    float endY = BOTTOM + 230; 
+    float tShore = (float)(landTop - endY) / (float)(landTop - BOTTOM);
+    float endX = 100.0f + (100.0f * tShore) + (25.0f * sinf(endY * 0.08f)) + (10.0f * cosf(endY * 0.2f));
+    
+    for (int i = 0; i < RIVER_SEGMENTS; i++) {
+        float t = (float)i / (RIVER_SEGMENTS - 1); 
+        
+        float px = startX + t * (endX - startX);
+        float py = startY + t * (endY - startY);
+        
+        // Membentuk huruf S yang lebih dinamis dan tak turun terlalu curam
+        float meanderX = 0;
+        float meanderY = sinf(t * 3.14159f * 2.5f) * 15.0f; // Kurva lebih landai
+        
+        riverPoints[i].x = px + meanderX;
+        riverPoints[i].y = py + meanderY;
+    }
 }
 
+extern double GetTime(void); // dari raylib (atau disuplai otomatis)
+
 void DrawLake() {
-    DrawRiver();      // sungai di layer bawah
-    DrawLakeBody();   // danau menutupi pangkal sungai
+    float time = (float)GetTime();
+
+    // 1. Gambar Dasar Sungai (Overlapping Solid Circles - Sangat Halus)
+    for (int i = 0; i < RIVER_SEGMENTS; i++) {
+        // Lebar sungai (melebar di akhir/muara)
+        float width = 6.0f + (i * 0.25f); 
+        Wrapper_DrawEllipseFilled((int)riverPoints[i].x, (int)riverPoints[i].y, (int)width, (int)(width * 0.9f), RIV_BLUE_DARK);
+    }
+    
+    for (int i = 0; i < RIVER_SEGMENTS; i++) {
+        float width = 4.0f + (i * 0.22f); 
+        Wrapper_DrawEllipseFilled((int)riverPoints[i].x, (int)riverPoints[i].y, (int)width, (int)(width * 0.9f), RIV_BLUE_LIGHT);
+    }
+    
+    // 2. Animasi Air Bergelembung Mengalir (Ripples)
+    for (int r = 0; r < 6; r++) { 
+        float rippleProgress = fmodf((time * 0.25f) + (r * 0.166f), 1.0f);
+        int idx = (int)(rippleProgress * (RIVER_SEGMENTS - 1));
+        
+        float width = 3.0f + (idx * 0.06f);
+        Wrapper_DrawEllipseFilled((int)riverPoints[idx].x, (int)riverPoints[idx].y, (int)width, (int)(width * 0.8f), RIV_RIPPLE);
+    }
 }
