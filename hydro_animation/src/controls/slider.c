@@ -1,6 +1,9 @@
 #include "slider.h"
 #include "raylib.h"
 #include <stdio.h>
+#include "../wrapper/draw_line.h"
+#include "../wrapper/draw_circle.h"
+#include "coords.h"
 
 void InitSlider(Slider* s, float x, float y, float width, float min, float max, float start) {
     s->x = x;
@@ -12,12 +15,21 @@ void InitSlider(Slider* s, float x, float y, float width, float min, float max, 
     s->isDragging = 0;
 }
 
+// ===========================
+// PERBAIKAN LOGIKA KOORDINAT UNTUK UI
+// ===========================
 void UpdateSlider(Slider* s) {
 
-    float knobX = s->x + ((s->value - s->minValue) / (s->maxValue - s->minValue)) * s->width;
+    // Hitung posisi knob di layar (bukan cartesian ya, karena mouse pos itu resolusi lokal)
+    float knobCartesianX = s->x + ((s->value - s->minValue) / (s->maxValue - s->minValue)) * s->width;
+    
+    // Titik tombol digeser ke kooridnates layar untuk deteksi sentuh akurat
+    int screenKnobX = CS_X((int)knobCartesianX);
+    int screenKnobY = CS_Y((int)s->y);
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){knobX-5, s->y-5, 10, 10})) {
+        // Kotak tumbukan tombol disempurnakan (area 20x20 pixel di sekitar pusat lingkaran)
+        if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){screenKnobX-10, screenKnobY-10, 20, 20})) {
             s->isDragging = 1;
         }
     }
@@ -29,26 +41,34 @@ void UpdateSlider(Slider* s) {
     if (s->isDragging) {
         float mouseX = GetMouseX();
 
-        if (mouseX < s->x) mouseX = s->x;
-        if (mouseX > s->x + s->width) mouseX = s->x + s->width;
+        // Batas rel pada titik layarnya
+        float screenMinX = CS_X((int)s->x);
+        float screenMaxX = CS_X((int)(s->x + s->width));
 
-        float t = (mouseX - s->x) / s->width;
+        if (mouseX < screenMinX) mouseX = screenMinX;
+        if (mouseX > screenMaxX) mouseX = screenMaxX;
+
+        // Proporsi nilai berdasarkan geseran murni layar
+        float t = (mouseX - screenMinX) / (screenMaxX - screenMinX);
         s->value = s->minValue + t * (s->maxValue - s->minValue);
     }
 }
+
 
 void DrawSlider(Slider* s, const char* label) {
 
     float knobX = s->x + ((s->value - s->minValue) / (s->maxValue - s->minValue)) * s->width;
 
     // garis slider
-    DrawLine(s->x, s->y, s->x + s->width, s->y, WHITE);
+    Wrapper_DrawLineThick((int)s->x, (int)s->y, (int)(s->x + s->width), (int)s->y, 3, WHITE);
 
     // knob
-    DrawCircle(knobX, s->y, 6, YELLOW);
+    Wrapper_DrawCircleFilled((int)knobX, (int)s->y, 6, YELLOW);
 
     // label
     char text[64];
     sprintf(text, "%s: %.2f", label, s->value);
-    DrawText(text, s->x, s->y - 25, 16, WHITE);
-}
+    // DrawText menggunakan fungsi asli raylib yang koordinat nol-nya di pojok,
+    // maka kita harus konversi titik Cartesian ini ke titik layar.
+    DrawText(text, CS_X((int)s->x), CS_Y((int)s->y) - 25, 16, WHITE);
+}
