@@ -7,15 +7,24 @@
 #include "../objects/land.h"
 #include "../objects/cloud.h"
 #include "../objects/lake.h"
+#include "../objects/rock.h"
+#include "../objects/grass.h"
+#include "../objects/flower.h"
 #include "../animation/evaporation.h"
 #include "../animation/transpiration.h"
 #include "../simulation/simulation_state.h"
 #include "../animation/advection.h"
 #include "../animation/precipitation.h"
 #include "../animation/infiltration.h"
+#include "../objects/birds.h"
+#include "../controls/slider.h"
+#include "../ui/button.h"
+#include "../../screen_type.h"
 #include "coords.h"
 #include <stdlib.h>
 
+static Slider evapSlider;
+static Button btnBackSim;
 
 void InitSimulation() {
     InitEvaporation();
@@ -24,6 +33,12 @@ void InitSimulation() {
     InitRain();
     InitLake();           // ← sebelum InitInfiltration
     InitInfiltration();
+    InitBirds();          // Inisiasi awal posisi burung
+    
+    // Inisiasi Slider evaporasi (Nilai antara 0.2 hingga 2.5 dengan awalan 1.0)
+    // Posisi: X Kiri, Y Atas
+    InitSlider(&evapSlider, LEFT + 40, TOP - 40, 150, 0.2f, 2.5f, 1.0f);
+    btnBackSim = CreateButton(20, 20, 150, 40, "Menu Utama");
 }
 
 
@@ -54,6 +69,12 @@ void DrawSimulation() {
     UpdateAdvection(dt);
     UpdateRain(dt);
     UpdateInfiltration(dt);
+    UpdateBirds(dt);      // Update gerak kepak sayap dan lintasan burung
+
+    // Update Slider dan timpa var simulasi
+    UpdateSlider(&evapSlider);
+    evaporationRate = evapSlider.value;
+
 
     // draw
     DrawEvaporation(); //evaporasi dari laut
@@ -62,12 +83,30 @@ void DrawSimulation() {
     DrawRain(); //precipitation (hujan) 
     DrawInfiltration(); //infiltrasi ke tanah
 
+    // Dekorasi alam (Batu, Rumput, Bunga)
+    int landTop = (int)(-HALF_H / 4.2f); // landtop patokan dasar land 
+    DrawRock(LEFT + 380, landTop + 5,  35, 18);
+    DrawRock(LEFT + 410, landTop + 2,  20, 10);
+    DrawRock(LEFT + 570, landTop + 5,  35, 18);
+    DrawRock(LEFT + 670, landTop - 2,  25, 12);
+
+    //DrawGrassTuft(LEFT + 250, landTop - 50);
+    //DrawGrassTuft(LEFT + 290, landTop - 65);
+    //DrawFlower(LEFT + 330,    landTop - 85);
+    //DrawGrassTuft(LEFT + 460, landTop - 30);
+    //DrawGrassTuft(LEFT + 490, landTop - 50);
+    //DrawFlower(LEFT + 550,    landTop - 70);
+    //DrawGrassTuft(LEFT + 750, landTop - 40);
+    //DrawFlower(LEFT + 700,    landTop - 60);
+
     // posisi pohon 
-    DrawTree(LEFT + 240, -HALF_H / 3);
-    DrawTree(LEFT + 600, -HALF_H / 2.8);
-    DrawTree(LEFT + 250, -HALF_H / 1.5);
-    DrawTree(LEFT + 640, -HALF_H / 2);
-    DrawTree(LEFT + 670, -HALF_H / 3);
+    // Menggunakan landTop (garis dasar padang rumput) sebagai patokan elevasi Y
+    DrawTree(LEFT + 240, landTop - 45);
+    DrawTree(LEFT + 670, landTop - 55);
+    DrawTree(LEFT + 280, landTop - 145);
+    DrawTree(LEFT + 540, landTop - 130);
+    DrawTree(LEFT + 740, landTop - 45);
+    DrawTree(LEFT + 720, landTop - 120);
 
     //awan
     DrawCloud(RIGHT - 400, TOP - 250);
@@ -76,4 +115,13 @@ void DrawSimulation() {
 
     DrawCloudDynamic(LEFT + 400, TOP - 250);
     DrawCloudDynamic(LEFT + 270, TOP - 200);
+
+    // Burung digambar paling depan (atas awan dan pohon)
+    DrawBirds();
+
+    // Gambar UI paling atas
+    DrawSlider(&evapSlider, "Evaporasi & Hujan");
+    
+    // Tombol kembali ke menu
+    if (DrawButton(&btnBackSim)) currentScreen = MENU_SCREEN;
 }
