@@ -18,3 +18,11 @@ int CS_X(int cart_x) {
 int CS_Y(int cart_y) {
     return G_OriginY - (int)(cart_y * G_TickStep);
 }
+
+float CS_Xf(float cart_x) {
+    return (float)G_OriginX + (cart_x * G_TickStep);
+}
+
+float CS_Yf(float cart_y) {
+    return (float)G_OriginY - (cart_y * G_TickStep);
+}

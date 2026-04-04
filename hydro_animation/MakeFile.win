@@ -1,17 +1,34 @@
-CC = gcc
-
-CFLAGS = -I. -I"C:/raylib/include"
-LDFLAGS = -L"C:/raylib/lib" -lraylib -lopengl32 -lgdi32 -lwinmm -lm
-
+CC = C:/raylib/w64devkit/bin/gcc.exe
+CFLAGS = -I. -IC:/raylib/raylib/src -Wall
+LDFLAGS = -LC:/raylib/raylib/src -lraylib -lopengl32 -lgdi32 -lwinmm -lm
 TARGET = hydrological_cycle.exe
 
-SRCS = main.c coords.c $(shell find src -name "*.c")
+SRCS = main.c coords.c \
+       src/screens/simulation_screen.c src/screens/menu_screen.c src/screens/info_screens.c \
+       src/ui/button.c src/objects/sky.c src/objects/sun.c src/objects/mountain.c \
+       src/objects/water.c src/objects/tree.c src/objects/land.c src/objects/cloud.c \
+       src/objects/lake.c src/objects/rock.c src/objects/grass.c src/objects/flower.c \
+       src/objects/birds.c \
+       src/animation/evaporation.c src/animation/transpiration.c \
+       src/animation/advection.c src/animation/precipitation.c \
+       src/animation/infiltration.c src/animation/collection.c \
+       src/simulation/simulation_state.c src/controls/slider.c \
+       src/algo/dda.c src/algo/bresenham.c src/algo/midcircle.c src/algo/midellipse.c \
+       src/wrapper/draw_circle.c src/wrapper/draw_ellipse.c src/wrapper/draw_line.c \
+       src/wrapper/draw_rectangle.c src/wrapper/draw_text.c
 
-all:
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS) $(LDFLAGS)
+OBJS = $(SRCS:.c=.o)
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(OBJS) $(TARGET)
 
 run: all
 	./$(TARGET)
-
-clean:
-	rm -f $(TARGET)

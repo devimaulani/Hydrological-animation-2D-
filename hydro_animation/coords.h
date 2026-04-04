@@ -20,8 +20,12 @@ extern float G_TickStep;
 extern int BASE_WIDTH;
 extern int BASE_HEIGHT;
 
-// fungsi konversi
+// fungsi konversi (integer)
 int CS_X(int cart_x);
 int CS_Y(int cart_y);
+
+// fungsi konversi (float untuk presisi pergerakan)
+float CS_Xf(float cart_x);
+float CS_Yf(float cart_y);
 
 #endif

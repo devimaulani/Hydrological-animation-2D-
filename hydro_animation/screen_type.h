@@ -5,10 +5,13 @@
 #define SCREEN_H 900
 
 typedef enum {
+    MENU_SCREEN,
     SIMULATION_SCREEN,
-    // MENU_SCREEN,
-    // SETTINGS_SCREEN,
-    // ...
+    RAIN_INFO_SCREEN,
+    SHAPE_INFO_SCREEN,
+    ABOUT_SCREEN
 } Screen;
+
+extern Screen currentScreen;
 
 #endif
