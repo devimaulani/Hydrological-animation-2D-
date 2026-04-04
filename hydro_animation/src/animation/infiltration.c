@@ -1,8 +1,11 @@
 #include "infiltration.h"
+#include "raylib.h"
 #include "../objects/lake.h"
 #include "../wrapper/draw_line.h"
 #include "../wrapper/draw_ellipse.h"
+#include "../objects/land.h"
 #include "coords.h"
+#include "../simulation/simulation_state.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -12,96 +15,89 @@
 // yang terus terlihat namun warna / intensitas alirannya berdenyut turun.
 // =========================================================
 
-#define VEIN_COUNT     6
-#define VEIN_SEGMENTS  30
+#define VEIN_COUNT 12
+#define VEIN_SEGMENTS 8
 
 typedef struct {
-    float x;
-    float y;
-} VeinNode;
+    float x, y;
+} Node;
 
 typedef struct {
-    VeinNode nodes[VEIN_SEGMENTS];
+    Node nodes[VEIN_SEGMENTS];
+    float speed;
+    float x; // Base X
 } Vein;
 
 static Vein veins[VEIN_COUNT];
-static int soilTop;
-static int aquiferTop;
+static float soilTop, aquiferTopDefault;
 
+// Mendapatkan X acak di area sungai
 static float RandomRiverX() {
-    int minX = LEFT + 230;
-    int maxX = 50;  // Batasi agar tidak muncul di tepian yang sudah dimundurkan
-    int range = maxX - minX;
-    return (float)(minX + (rand() % range));
+    return (float)(LEFT + 250 + (rand() % 400));
 }
 
 void InitInfiltration() {
-    soilTop = BOTTOM + 180; 
-    // Mengikuti batas aquifer tebal yang Anda tetapkan 
-    aquiferTop = BOTTOM + 160; 
+    soilTop = BOTTOM + 155; 
+    aquiferTopDefault = BOTTOM + 130; 
 
     for (int v = 0; v < VEIN_COUNT; v++) {
         float cx = RandomRiverX();
-        float cy = (float)soilTop;
+        veins[v].x = cx;
         
-        float depthRange = (float)(soilTop - aquiferTop);
-        float stepY = depthRange / (VEIN_SEGMENTS - 1);
+        // --- DINAMIS: Ikuti Gelombang Aqifer ---
+        float wave = (float)GetLayerWave((int)cx);
+        float currentAquiferTop = aquiferTopDefault + wave;
+        float currentSoilTop = soilTop + wave;
+
+        veins[v].nodes[0].x = cx;
+        veins[v].nodes[0].y = currentSoilTop;
         
-        for (int i = 0; i < VEIN_SEGMENTS; i++) {
-            veins[v].nodes[i].x = cx;
-            veins[v].nodes[i].y = cy;
-            
-            // Memberikan rute acak/zigzag terbatas agar tetap di dalam tanah
-            cx += (float)((rand() % 11) - 5.5f);
-            cy -= stepY;
+        float dy = (currentSoilTop - currentAquiferTop) / (float)VEIN_SEGMENTS;
+        
+        for (int i = 1; i < VEIN_SEGMENTS; i++) {
+            veins[v].nodes[i].x = cx + (float)((rand() % 20) - 10);
+            veins[v].nodes[i].y = currentSoilTop - (dy * (float)i);
         }
     }
 }
 
+
 void UpdateInfiltration(float dt) {
     // Jalurnya statis permanen bagai pembuluh, animasinya terjadi secara visual di fungsi Draw
 }
-
-extern double GetTime(void);
 
 void DrawInfiltration() {
     float time = (float)GetTime();
 
     for (int v = 0; v < VEIN_COUNT; v++) {
         for (int i = 0; i < VEIN_SEGMENTS - 1; i++) {
-            // Animasi denyut (pulse) merambat turun
             float phase = (time * 5.0f) - (i * 0.35f);
             float pulse = (sinf(phase) + 1.0f) / 2.0f; 
             
-            // Makin ke bawah makin redup alaminya
             int baseAlpha = 220 - (i * 4);
             if (baseAlpha < 20) baseAlpha = 20;
 
-            // Mode "kering" atau "remang" saat tidak ada tetesan air melewatinya
             Color c = (Color){50, 110, 170, (unsigned char)(baseAlpha * 0.3f)};
-            int thickness = 2;
+            float thickness = 2.0f;
             
-            // Mode "basah/dilewati air" saat denyut (pulse) aliran bergerak menimpanya
             if (pulse > 0.75f) {
                 c = (Color){80, 180, 255, (unsigned char)baseAlpha}; 
-                thickness = 4; // Terlihat lebih nyata dan menonjol
+                thickness = 4.0f;
             }
             
-            // Gambar urat urat tanah secara bersambung
             Wrapper_DrawLineThick(
-                (int)veins[v].nodes[i].x, (int)veins[v].nodes[i].y, 
-                (int)veins[v].nodes[i+1].x, (int)veins[v].nodes[i+1].y, 
+                veins[v].nodes[i].x, veins[v].nodes[i].y, 
+                veins[v].nodes[i+1].x, veins[v].nodes[i+1].y, 
                 thickness, c
             );
 
-            // Pada ujung node (batas aquifer), gambar efek genangan melebar perlahan
             if (i == VEIN_SEGMENTS - 2 && pulse > 0.4f) {
-                float intensity = pulse - 0.4f; // 0.0 -> 0.6
+                float intensity = pulse - 0.4f;
                 Wrapper_DrawEllipseFilled(
-                    (int)veins[v].nodes[i+1].x, 
-                    (int)veins[v].nodes[i+1].y, 
-                    (int)(30.0f * intensity),   // Melebar ke samping 
-                    (int)(6.0f * intensity),   // Sangat tipis membentuk genangan
+                    veins[v].nodes[i+1].x, 
+                    veins[v].nodes[i+1].y, 
+                    30.0f * intensity,
+                    6.0f * intensity,
                     c
                 );
             }

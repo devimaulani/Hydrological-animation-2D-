@@ -2,6 +2,7 @@
 #define ADVECTION_H
 
 void InitAdvection();
+void ResetAdvection();
 void UpdateAdvection(float dt);
 void DrawAdvection();
 

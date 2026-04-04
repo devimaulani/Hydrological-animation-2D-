@@ -13,6 +13,9 @@
 
 #define BASE_SPEED 45.0f
 
+// Zona memudar: uap mulai memudar di 70% perjalanan ke awan
+#define FADE_START_RATIO 0.7f
+
 typedef struct {
     float x;
     float y;
@@ -47,21 +50,42 @@ static void DrawWave(float xBase, float yBase, float phase) {
     float step = 3.0f;
     float length = 70.0f;
 
+    // Hitung progress perjalanan (0.0 = di tanah, 1.0 = di awan)
+    float totalRange = (float)(CLOUD_Y - BASE_Y);
+    float progress = (yBase - (float)BASE_Y) / totalRange;
+    if (progress < 0.0f) progress = 0.0f;
+    if (progress > 1.0f) progress = 1.0f;
+
+    // Faktor memudar: mulai memudar setelah 70% perjalanan
+    float fadeFactor = 1.0f;
+    if (progress > FADE_START_RATIO) {
+        // Memudar secara bertahap dari 1.0 ke 0.0
+        fadeFactor = 1.0f - ((progress - FADE_START_RATIO) / (1.0f - FADE_START_RATIO));
+        if (fadeFactor < 0.0f) fadeFactor = 0.0f;
+    }
+
+    // Juga memudar di awal perjalanan (muncul secara bertahap)
+    float appearFactor = 1.0f;
+    if (progress < 0.15f) {
+        appearFactor = progress / 0.15f;
+    }
+
+    float totalOpacity = fadeFactor * appearFactor;
+
     for (float dy = 0; dy < length; dy += step) {
-        // Efek transparan/fade di pangkal dan ujung
         float alphaFactor = 1.0f - fabsf(dy - (length / 2.0f)) / (length / 2.0f);
         if (alphaFactor < 0.0f) alphaFactor = 0.0f;
-        unsigned char alpha = (unsigned char)(180 * alphaFactor);
+        unsigned char alpha = (unsigned char)(180 * alphaFactor * totalOpacity);
+        if (alpha < 3) continue;  // Lewati jika terlalu transparan
         
         float currentY = yBase + dy;
-        float waktu = GetTime() * 1.5f;
+        float waktu = (float)GetTime() * 1.5f;
         
-        // Gelombang bergerak dan mendayu sesuai waktu
         float offset = amplitude * sinf(currentY * frequency + phase + waktu);
         float nextOffset = amplitude * sinf((currentY + step) * frequency + phase + waktu);
         
         Color renderColor = (Color){color.r, color.g, color.b, alpha};
-        Wrapper_DrawLineThick((int)(xBase + offset), (int)currentY, (int)(xBase + nextOffset), (int)(currentY + step), 3, renderColor);
+        Wrapper_DrawLineThick(xBase + offset, currentY, xBase + nextOffset, currentY + step, 3.0f, renderColor);
     }
 }
 
