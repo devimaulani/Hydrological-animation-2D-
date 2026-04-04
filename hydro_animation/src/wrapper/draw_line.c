@@ -2,25 +2,25 @@
 #include "../algo/bresenham.h"
 #include "coords.h"
 
-void Wrapper_DrawLine(int x1, int y1, int x2, int y2, Color color) {
-
+void Wrapper_DrawLine(float x1, float y1, float x2, float y2, Color color) {
+    // Cast ke int hanya di langkah terakhir sebelum memanggil algoritma garis
     BresenhamLine(
-        CS_X(x1),
-        CS_Y(y1),
-        CS_X(x2),
-        CS_Y(y2),
+        (int)CS_Xf(x1),
+        (int)CS_Yf(y1),
+        (int)CS_Xf(x2),
+        (int)CS_Yf(y2),
         color
     );
 }
 
-void Wrapper_DrawLineThick(int x1, int y1, int x2, int y2, int thick, Color color) {
-
+void Wrapper_DrawLineThick(float x1, float y1, float x2, float y2, float thick, Color color) {
+    // Scaling tebal tetap menggunakan tick step
     Bres_ThickLine(
-        CS_X(x1),
-        CS_Y(y1),
-        CS_X(x2),
-        CS_Y(y2),
-        thick * G_TickStep, // 🔥 scaling tebal
+        (int)CS_Xf(x1),
+        (int)CS_Yf(y1),
+        (int)CS_Xf(x2),
+        (int)CS_Yf(y2),
+        (int)(thick * G_TickStep),
         color
     );
 }

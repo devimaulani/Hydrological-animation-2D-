@@ -3,7 +3,8 @@
 
 #include "raylib.h"
 
-void Wrapper_DrawLine(int x1, int y1, int x2, int y2, Color color);
-void Wrapper_DrawLineThick(int x1, int y1, int x2, int y2, int thick, Color color);
+// Menggunakan float untuk koordinat agar pergerakan halus (tidak patah-patah)
+void Wrapper_DrawLine(float x1, float y1, float x2, float y2, Color color);
+void Wrapper_DrawLineThick(float x1, float y1, float x2, float y2, float thick, Color color);
 
 #endif

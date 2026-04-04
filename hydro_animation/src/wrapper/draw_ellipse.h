@@ -3,7 +3,7 @@
 
 #include "raylib.h"
 
-void Wrapper_DrawEllipse(int cx, int cy, int rx, int ry, Color color);
-void Wrapper_DrawEllipseFilled(int cx, int cy, int rx, int ry, Color color);
+void Wrapper_DrawEllipse(float x, float y, float rx, float ry, Color color);
+void Wrapper_DrawEllipseFilled(float x, float y, float rx, float ry, Color color);
 
 #endif

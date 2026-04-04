@@ -2,22 +2,20 @@
 #include "../algo/midcircle.h"
 #include "coords.h"
 
-void Wrapper_DrawCircle(int x, int y, int r, Color color) {
-
+void Wrapper_DrawCircle(float x, float y, float r, Color color) {
     Midcircle(
-        CS_X(x),
-        CS_Y(y),
-        r * G_TickStep,
+        (int)CS_Xf(x),
+        (int)CS_Yf(y),
+        (int)(r * G_TickStep),
         color
     );
 }
 
-void Wrapper_DrawCircleFilled(int x, int y, int r, Color color) {
-
+void Wrapper_DrawCircleFilled(float x, float y, float r, Color color) {
     MidcircleFilled(
-        CS_X(x),
-        CS_Y(y),
-        r * G_TickStep,
+        (int)CS_Xf(x),
+        (int)CS_Yf(y),
+        (int)(r * G_TickStep),
         color
     );
 }
