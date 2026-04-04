@@ -14,7 +14,15 @@
 
 #define LAKE_BOTTOM_Y   (LAKE_CENTER_Y - LAKE_RADIUS_Y)
 
+// Titik segmen sungai untuk diakses modul animasi luar
+typedef struct { float x; float y; } RiverPoint;
+#define RIVER_SEGMENTS 120
+
 void InitLake();
-void DrawLake();
+void DrawLake(float overflow);
+
+// Fungsi akses data (Getter) untuk animasi Collection
+RiverPoint* GetRiverPoints();
+int GetRiverSegmentCount();
 
 #endif

@@ -3,13 +3,7 @@
 #include "coords.h"
 #include <math.h>
 
-// Fungsi untuk menggambar satu gunung dengan bentuk kurva lonceng / cosinus
-// Parameter:
-//   cx    : Titik tengah (puncak) gunung
-//   w     : Lebar setengah gunung (radius horizontal)
-//   h     : Tinggi maksimal gunung
-//   color : Warna gunung
-//   baseY : Ketinggian dasar (tanah)
+
 static void DrawSingleMountain(int cx, int w, int h, Color color, int baseY) {
     for (int x = cx - w; x <= cx + w; x++) {
         // Keamanan: pastikan gunung tidak pernah melewati batas awal tebing laut (di x = 100)
@@ -35,17 +29,9 @@ static void DrawSingleMountain(int cx, int w, int h, Color color, int baseY) {
 }
 
 void DrawMountain() {
-    // =========================
-    // PARAMETER DASAR
-    // =========================
-    // Diselaraskan dengan awal daratan di land.c agar tidak ada celah udara
+
     int landTop = (int)(-HALF_H / 4.2f) - 5; 
-
-    // =========================
-    // MENGGAMBAR PEGUNUNGAN (DARI BELAKANG KE DEPAN)
-    // Terdapat 5 puncak gunung yang digambar agar membentuk sebuah deretan pegunungan natural
-    // =========================
-
+    
     // LAPIS 1: Lapisan Paling Belakang (Paling redup warnanya karena jauh)
     //(semakin besar minus semakin ke kiri)
     DrawSingleMountain(-200, 160, 140, (Color){100, 150, 110, 255}, landTop);

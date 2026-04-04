@@ -1,53 +1,65 @@
 #include "cloud.h"
 #include "../wrapper/draw_ellipse.h"
-#include "../simulation/simulation_state.h"
-#include "../animation/advection.h"
 #include <math.h>
-#include "raylib.h"
 
-// Membantu pergerakan awan horizontal berulang berkat waktu
-static int GetWindOffset(float multiplier, float offsetPhase) {
-    float time = GetTime();
-    // Awan akan bergeser ke kiri dan kanan sedikit demi sedikit, atau mengambang
-    return (int)(sin(time * 0.2f + offsetPhase) * 40.0f * multiplier);
+// Membantu pergerakan awan horizontal lembut berkat waktu (internal swaying)
+static float GetInternalSway(float multiplier, float offsetPhase) {
+    float time = (float)GetTime();
+    return sinf(time * 0.4f + offsetPhase) * 15.0f * multiplier;
 }
 
-// awan fleksibel & sesuai Cartesian
-void DrawCloud(int x, int y) {
+// Helper: Lerp satu byte warna
+static unsigned char LerpByte(unsigned char a, unsigned char b, float t) {
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    return (unsigned char)((float)a + ((float)b - (float)a) * t);
+}
 
-    Color c = (Color){240,240,240,255};
-
-    int scale = (int)(cloudDensity * 20); // inti kondensasi
+// 1. Awan Tipe A (Standard - Growing Size)
+void DrawCloud(float x, float y, float opacity) {
+    unsigned char alpha = (unsigned char)(255 * opacity);
+    if (alpha < 5) alpha = 0; 
     
-    // Angin menggeser posisi asli
-    int shiftX = x + GetWindOffset(1.0f, 0.0f);
+    Color c = (Color){245, 245, 245, alpha};
+    
+    // GROWING SIZE: Awan membesar dari 40% hingga 100% ukurannya
+    float growth = 0.4f + (0.6f * opacity);
+    float baseW = 50.0f * growth;
+    float baseH = 25.0f * growth;
+    
+    float shiftX = x + GetInternalSway(1.0f, 0.0f);
 
-    Wrapper_DrawEllipseFilled(shiftX, y, 50+scale, 25+scale/2, c);
-
-    Wrapper_DrawEllipseFilled(shiftX-30, y+20, 35+scale/2, 20+scale/3, c);
-    Wrapper_DrawEllipseFilled(shiftX+30, y+20, 35+scale/2, 20+scale/3, c);
-
-    Wrapper_DrawEllipseFilled(shiftX, y+35, 30+scale/2, 18+scale/3, c);
+    Wrapper_DrawEllipseFilled(shiftX, y, baseW, baseH, c);
+    Wrapper_DrawEllipseFilled(shiftX - 35.0f * growth, y + 15.0f * growth, 40.0f * growth, 22.0f * growth, c);
+    Wrapper_DrawEllipseFilled(shiftX + 35.0f * growth, y + 15.0f * growth, 40.0f * growth, 22.0f * growth, c);
+    Wrapper_DrawEllipseFilled(shiftX, y + 30.0f * growth, 35.0f * growth, 20.0f * growth, c);
 }
 
-void DrawCloudDynamic(int x, int y) {
+// 2. Awan Tipe B (Dynamic - Growing Size & Gradual Dark State)
+//    darkProgress: 0.0 = putih murni, 1.0 = gelap penuh (abu-abu tua)
+void DrawCloudDynamic(float x, float y, float opacity, float darkProgress) {
+    unsigned char alpha = (unsigned char)(255 * opacity);
+    if (alpha < 5) alpha = 0;
 
-    // 🔥 cek kondisi angin
-    int isDark = IsWindReachedLand();
+    // Transisi warna bertahap: putih → abu-abu tua
+    Color white = {255, 255, 255, alpha};
+    Color dark  = {70, 75, 85, alpha};
 
     Color cloudColor;
+    cloudColor.r = LerpByte(white.r, dark.r, darkProgress);
+    cloudColor.g = LerpByte(white.g, dark.g, darkProgress);
+    cloudColor.b = LerpByte(white.b, dark.b, darkProgress);
+    cloudColor.a = alpha;
 
-    if (isDark) {
-        cloudColor = (Color){120, 120, 120, 255}; // gelap (mendung)
-    } else {
-        cloudColor = (Color){240, 240, 240, 255}; // normal
-    }
+    float growth = 0.4f + (0.6f * opacity);
+    float baseW = 65.0f * growth;
+    float baseH = 28.0f * growth;
+    
+    float shiftX = x + GetInternalSway(1.2f, 2.5f);
 
-    // Angin menggeser posisi asli dengan fase berbeda
-    int shiftX = x + GetWindOffset(1.5f, 2.0f);
-
-    Wrapper_DrawEllipseFilled(shiftX, y, 50, 25, cloudColor);
-    Wrapper_DrawEllipseFilled(shiftX - 30, y + 20, 35, 20, cloudColor);
-    Wrapper_DrawEllipseFilled(shiftX + 30, y + 20, 35, 20, cloudColor);
-    Wrapper_DrawEllipseFilled(shiftX, y + 35, 30, 18, cloudColor);
-}
+    Wrapper_DrawEllipseFilled(shiftX, y, baseW, baseH, cloudColor);
+    Wrapper_DrawEllipseFilled(shiftX - 45.0f * growth, y + 10.0f * growth, 45.0f * growth, 25.0f * growth, cloudColor);
+    Wrapper_DrawEllipseFilled(shiftX + 45.0f * growth, y + 10.0f * growth, 45.0f * growth, 25.0f * growth, cloudColor);
+    Wrapper_DrawEllipseFilled(shiftX - 20.0f * growth, y + 35.0f * growth, 40.0f * growth, 22.0f * growth, cloudColor);
+    Wrapper_DrawEllipseFilled(shiftX + 20.0f * growth, y + 35.0f * growth, 40.0f * growth, 22.0f * growth, cloudColor);
+}

@@ -55,42 +55,22 @@ void UpdateBirds(float dt) {
 
 void DrawBirds() {
     for(int i = 0; i < MAX_BIRDS; i++) {
-        int cx = (int)birds[i].x;
-        int cy = (int)birds[i].y;
+        float cx = birds[i].x;
+        float cy = birds[i].y;
         
-        // Peringkat Penilaian Terpenuhi (VARIASI OBJEK GERAK "Kepakan Sayap"):
-        // Kalkulasi siklus kepakan menggunakan fungsi sinus sehingga pergerakan mulus bolak-balik.
-        float wingCycle = sin(globalTime * birds[i].flapSpeed + birds[i].phase);
+        float wingCycle = sinf(globalTime * birds[i].flapSpeed + birds[i].phase);
+        float wingYOffset = wingCycle * 12.0f; 
         
-        // Konversi hasil siklus sudut (yang berkisar -1 hingga 1) ke perpindahan piksel sayap secara vertikal.
-        int wingYOffset = (int)(wingCycle * 12.0f); 
-        
-        // Titik ujung sayap akan bergerak naik-turun secara presisi
-        int tipX = 14; 
-        int tipY = -8 + wingYOffset; // Ke atas kalau offset positif
+        float tipX = 14.0f; 
+        float tipY = -8.0f + wingYOffset; 
         
         // Gambar Sayap Kiri
-        Wrapper_DrawLineThick(
-            cx, cy,                // Titik Punggung
-            cx - tipX, cy + tipY,  // Ujung Sayap Kiri
-            2, 
-            BLACK
-        );
+        Wrapper_DrawLineThick(cx, cy, cx - tipX, cy + tipY, 2.0f, BLACK);
         
         // Gambar Sayap Kanan
-        Wrapper_DrawLineThick(
-            cx, cy,                // Titik Punggung
-            cx + tipX, cy + tipY,  // Ujung Sayap Kanan
-            2, 
-            BLACK
-        );
+        Wrapper_DrawLineThick(cx, cy, cx + tipX, cy + tipY, 2.0f, BLACK);
         
-        // Gambar Tubuh Tengah (Pusat titik tumpu kepak sayap)
-        Wrapper_DrawLineThick(
-            cx, cy,
-            cx, cy - 3, 
-            3,
-            BLACK
-        );
+        // Gambar Tubuh Tengah
+        Wrapper_DrawLineThick(cx, cy, cx, cy - 3.0f, 3.0f, BLACK);
     }
 }

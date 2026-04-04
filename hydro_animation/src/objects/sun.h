@@ -1,6 +1,6 @@
 #ifndef SUN_H
 #define SUN_H
 
-void DrawSun(int x, int y, int r);
+void DrawSun(float x, float y, float r, float opacity);
 
 #endif

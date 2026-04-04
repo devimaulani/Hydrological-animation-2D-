@@ -3,6 +3,6 @@
 
 #include <raylib.h>
 
-void DrawGrassTuft(int cx, int cy);
+void DrawGrassTuft(int cx, int cy, float sway);
 
 #endif

@@ -4,54 +4,33 @@
 #include <math.h>
 #include "raylib.h"
 
-void DrawSun(int cx, int cy, int r) {
+void DrawSun(float cx, float cy, float r, float opacity) {
+    if (opacity <= 0.0f) return;
 
-    Color sunColor = YELLOW;
-    float time = GetTime();
+    float time = (float)GetTime();
 
-    // Denyut ukuran glow menggunakan sin berdasarkan waktu
-    float pulse = sin(time * 2.0f); // osilasi -1.0 hingga 1.0
-    int glowOffset = (int)(pulse * 5.0f); 
-
-    // =========================
-    // INTI MATAHARI DENGAN EFEK GLOW MEMBESAR-MENGECIL
-    // =========================
-    // Lapis pinggir (paling pudar & besar, dipengaruhi denyut kuat)
-    Wrapper_DrawCircleFilled(cx, cy, r + 20 + glowOffset * 2, (Color){255, 255, 0, 30});
-    Wrapper_DrawCircleFilled(cx, cy, r + 10 + glowOffset, (Color){255, 255, 0, 80});
-    // Lapis tengah (stabil)
-    Wrapper_DrawCircleFilled(cx, cy, r, sunColor);
-    // Lapis inti (paling terang/panas)
-    Wrapper_DrawCircleFilled(cx, cy, r - 15, (Color){255, 255, 200, 255});
-
-    // =========================
-    // SINAR MATAHARI (Osilasi memanjang-memendek)
-    // =========================
-    // Sinar ikut memendek dan memanjang
-    int rayLength = r + 30 + (int)(pulse * 8.0f);
-
-    for (int i = 0; i < 360; i += 20) {
-
-        float rad = i * (3.14159f / 180.0f);
+    float pulse = sinf(time * 1.5f); 
+    
+    unsigned char baseAlpha = (unsigned char)(255 * opacity);
+    
+    //pancaran cahaya
+    for (int i = 0; i < 3; i++) {
+        // Fase waktu yang berbeda untuk tiap cincin (0.0, 0.33, 0.66)
+        float offset = i * 0.33f;
+        // Progress siklus (0.0 = pusat, 1.0 = hilang di kejauhan)
+        float progress = fmodf(time * 0.5f + offset, 1.0f);
         
-        // Mempertahankan variasi sinar panjang/pendek
-        int currentRayLen = rayLength;
-        if (i % 40 == 0) {
-            currentRayLen += 15; 
+        // Ukuran ring memancar dari inti hingga sangat lebar
+        float ringRadius = r + (progress * 130.0f);
+        // Alpha memudar seiring ukuran membesar
+        unsigned char ringAlpha = (unsigned char)(100 * (1.0f - progress) * opacity);
+        
+        if (ringAlpha > 5) {
+            Color ringColor = (Color){255, 255, 150, ringAlpha};
+            Wrapper_DrawCircleFilled(cx, cy, ringRadius, ringColor);
         }
-
-        int x2 = cx + cos(rad) * currentRayLen;
-        int y2 = cy + sin(rad) * currentRayLen;
-
-        int x1 = cx + cos(rad) * (r + 10);
-        int y1 = cy + sin(rad) * (r + 10);
-
-        Wrapper_DrawLineThick(
-            x1, y1,
-            x2, y2,
-            2,
-            (Color){255, 230, 0, 180}
-        );
     }
+
+    // Lapis utama - Satu warna Kuning Bersinar yang Solid
+    Wrapper_DrawCircleFilled(cx, cy, r, (Color){255, 235, 0, baseAlpha});
 }
-

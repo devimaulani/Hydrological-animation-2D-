@@ -3,6 +3,6 @@
 
 #include <raylib.h>
 
-void DrawFlower(int cx, int cy);
+void DrawFlower(int cx, int cy, float sway);
 
 #endif

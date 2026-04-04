@@ -1,17 +1,16 @@
 #include "water.h"
 #include "coords.h"
 #include "../wrapper/draw_line.h"
+#include "../wrapper/draw_circle.h"
 #include <math.h>
 #include "raylib.h"
 
 void DrawWater(int yStart) {
-    float tOff = GetTime() * 1.5f; // Kecepatan lambat aliran perairan
+    float tOff = (float)GetTime() * 1.5f; 
     int landTop = (int)(-HALF_H / 4.2f); 
 
-    // Laut digambar berlapis perlahan dari atas ke dasar
-    for (int y = yStart; y > BOTTOM; y -= 4) { // Turun tiap 4 piksel untuk mengefisiensi performa 
-        
-        // Gradasi warna: makin bawah makin gelap
+    // Langkah vertikal diperkecil (y--) agar air terlihat padat dan halus
+    for (int y = yStart; y > BOTTOM; y--) { 
         int depthFactor = yStart - y; 
         int blue = 255 - (depthFactor / 2);
         if (blue < 100) blue = 100;
@@ -20,47 +19,63 @@ void DrawWater(int yStart) {
 
         Color layerColor = (Color){20, green, blue, 255};
 
-        // Menyesuaikan titik mulai laut agar persis menyambung ke tepian daratan
-        // Formula HARUS sama dengan GetShoreX di land.c
         float tRatio = (float)(landTop - y) / (float)(landTop - BOTTOM); 
-        int startX = 100 + (int)(100.0f * tRatio);
-        startX += (int)(25.0f * sinf((float)y * 0.08f)) + (int)(10.0f * cosf((float)y * 0.2f));
+        float startX = 100.0f + (100.0f * tRatio);
+        startX += (25.0f * sinf((float)y * 0.08f)) + (10.0f * cosf((float)y * 0.2f));
         
-        // Dinamika ombak di setiap lapisan (makin ke dasar laut, amplitudonya makin kecil/mereda)
+        // GESER KE KIRI sedikit agar tidak ada celah dengan land
+        startX -= 5.0f;
+        
         float amp = 7.0f - (depthFactor * 0.02f);
         if (amp < 0.5f) amp = 0.5f; 
         
         float freq = 0.015f;
+        float currentPhase = tOff + ((float)y * 0.1f);
         
-        // Fase ombak bergeser di setiap kedalaman 'y' yang berbeda, sehingga animasi laut tampak bergulung menyatu dari dasar
-        float currentPhase = tOff + (y * 0.1f);
-        
-        int prevX = startX;
-        int prevY = y + (int)(amp * sinf(startX * freq + currentPhase));
+        float prevX = startX;
+        float prevY = (float)y + (amp * sinf(startX * freq + currentPhase));
 
-        // Gambar perlapisan gelombang tebal (ketebalan 6 menutup sela lompatan y-=4 yang hilang)
-        for (int x = startX + 10; x <= RIGHT + 10; x += 10) {
+        // Langkah horizontal diperkecil (x += 1.0f) agar kurva gelombang mulus
+        for (float x = startX + 1.0f; x <= (float)RIGHT + 10.0f; x += 1.0f) {
             float bA = x * freq + currentPhase;
-            int currentY = y + (int)(amp * sinf(bA));
-            Wrapper_DrawLineThick(prevX, prevY, x, currentY, 6, layerColor);
+            float currentY = (float)y + (amp * sinf(bA));
+            // Ketebalan dikurangi agar antar lapisan menyatu halus
+            Wrapper_DrawLineThick(prevX, prevY, x, currentY, 1.5f, layerColor);
             prevX = x;
             prevY = currentY;
         }
+
+        // --- TAMBAHAN: BUIH DEBURAN OMBAK (SHORELINE FOAM) ---
+        // Digambar di titik pertemuan air dan tanah (startX)
+        float foamSway = 4.0f * sinf((float)GetTime() * 6.0f + (float)y * 0.15f);
+        float alphaOsc = 150 + 100 * sinf((float)GetTime() * 8.0f + (float)y * 0.5f);
+        Color foamCol = (Color){220, 245, 255, (unsigned char)alphaOsc};
+        
+        // Gambar beberapa lingkaran busa kecil yang bertumpuk (cluster)
+        // Mengecil seiring kedalaman (y)
+        float foamSize = 4.0f * (1.0f - (float)depthFactor / (yStart - BOTTOM));
+        if (foamSize < 1.0f) foamSize = 1.0f; 
+
+        Wrapper_DrawCircleFilled(startX + foamSway, (float)y, foamSize, foamCol);
+        if (y % 3 == 0) {
+            Wrapper_DrawCircleFilled(startX + foamSway - 3.0f, (float)y + 2.0f, foamSize * 0.7f, foamCol);
+        }
     }
     
-    // Sentuhan Terakhir: Buih cerah (highlight air) mengambang tegas namun menyatu memeluk garis riak ombak paling atas saja
+    // Perbaikan Buih di permukaan air (Shoreline foam)
     float tRatioBuih = (float)(landTop - yStart) / (float)(landTop - BOTTOM); 
-    int buihStartX = 100 + (int)(100.0f * tRatioBuih);
-    buihStartX += (int)(25.0f * sinf((float)yStart * 0.08f)) + (int)(10.0f * cosf((float)yStart * 0.2f));
+    float buihStartX = 100.0f + (100.0f * tRatioBuih);
+    buihStartX += (25.0f * sinf((float)yStart * 0.08f)) + (10.0f * cosf((float)yStart * 0.2f)) - 5.0f;
     
-    int pX = buihStartX;
-    float buihPhase = tOff + (yStart * 0.1f);
-    int pY = yStart + (int)(7.0f * sinf(buihStartX * 0.015f + buihPhase));
+    float pX = buihStartX;
+    float buihPhase = tOff + ((float)yStart * 0.1f);
+    float pY = (float)yStart + (7.0f * sinf(buihStartX * 0.015f + buihPhase));
     
-    for (int x = buihStartX + 10; x <= RIGHT + 10; x += 10) {
+    // Resolusi buih ditingkatkan
+    for (float x = buihStartX + 2.0f; x <= (float)RIGHT + 10.0f; x += 2.0f) {
         float bA = x * 0.015f + buihPhase;
-        int cY = yStart + (int)(7.0f * sinf(bA));
-        Wrapper_DrawLineThick(pX, pY + 2, x, cY + 2, 4, (Color){180, 230, 255, 180});
+        float cY = (float)yStart + (7.0f * sinf(bA));
+        Wrapper_DrawLineThick(pX, pY + 1.5f, x, cY + 1.5f, 2.0f, (Color){180, 230, 255, 180});
         pX = x;
         pY = cY;
     }
