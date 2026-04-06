@@ -1,6 +1,7 @@
 #include "mountain.h"
 #include "../wrapper/draw_line.h"
 #include "coords.h"
+#include "../simulation/simulation_state.h"
 #include <math.h>
 
 
@@ -20,10 +21,15 @@ static void DrawSingleMountain(int cx, int w, int h, Color color, int baseY) {
         float heightVal = h * powf(cosf(t * 3.14159f / 2.0f), 2.2f);
         int peakY = baseY + (int)heightVal;
 
-        // Gambar pilar vertikal dari dasar tanah hingga ke permukaan gunung
+        // Gambar pilar vertikal atau sekedar outline (wireframe)
         if (peakY > baseY) {
-            // Ketebalan 2 untuk memastikan tidak ada celah kosong antar garis
-            Wrapper_DrawLineThick(x, baseY, x, peakY, 2, color);
+            if (isWireframeMode) {
+                // Hanya menggambar garis terluar (batas atas puncak)
+                Wrapper_DrawLineThick(x, peakY - 1, x, peakY + 1, 2, color);
+            } else {
+                // Ketebalan 2 untuk memastikan tidak ada celah kosong antar garis
+                Wrapper_DrawLineThick(x, baseY, x, peakY, 2, color);
+            }
         }
     }
 }

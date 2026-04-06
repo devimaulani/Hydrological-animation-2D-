@@ -3,6 +3,7 @@
 #include "coords.h"
 #include <math.h>
 #include "raylib.h"
+#include "../simulation/simulation_state.h"
 
 
 static int GetShoreX(int y) {
@@ -113,7 +114,15 @@ void DrawLand() {
                 c = (Color){50, 140, 210, 255};
             }
 
-            Wrapper_DrawLineThick(x, y, x + 1, y, 2, c);
+            if (isWireframeMode) {
+                // Di wireframe mode, kita hanya menggambar batas daratan teratas
+                // Jangan menggambar isi penuh untuk memberikan efek transparan
+                if (y >= currentSurface - 2 && y <= currentSurface + 2) {
+                    Wrapper_DrawLineThick(x, y, x + 1, y, 2, c);
+                }
+            } else {
+                Wrapper_DrawLineThick(x, y, x + 1, y, 2, c);
+            }
         }
     }
 }
