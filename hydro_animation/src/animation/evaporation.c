@@ -36,8 +36,8 @@ void InitEvaporation() {
 void UpdateEvaporation(float dt) {
     for (int i = 0; i < VAPOR_COUNT; i++) {
 
-        // dipengaruhi matahari
-        vapors[i].y += BASE_SPEED * evaporationRate * sunIntensity * dt;
+        // dipengaruhi matahari dan multiplier slider
+        vapors[i].y += BASE_SPEED * evaporationRate * sunIntensity * evaporationSpeedMult * dt;
 
         if (vapors[i].y > CLOUD_Y) {
             vapors[i].y = SEA_Y;

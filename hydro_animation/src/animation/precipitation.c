@@ -8,80 +8,64 @@
 #include <stdlib.h>
 #include <math.h>
 
+#define RAIN_COUNT   60     // Ditambah agar lebih merata
+#define SPLASH_COUNT 35
+#define SPEED_MIN    220.0f
+#define SPEED_MAX    380.0f
 
-#define CLOUD_Y      (TOP  - 250)   // batas atas hujan (di bawah awan)
-#define GROUND_Y     (BOTTOM + 240)  // diperpanjang sedikit ke bawah agar ke daratan
-
-
-#define RAIN_COUNT   48
-
-#define SPEED_MIN    80.0f
-#define SPEED_MAX   150.0f
-
-
-#define SPLASH_COUNT  16
-#define SPLASH_LIFETIME 0.5f  // Waktu hidup percikan dalam detik
-
-typedef struct {
-    float x;
-    float y;
-    float timer;      // Waktu sejak percikan muncul
-    float size;        // Ukuran lengkungan percikan
-    int active;        // Apakah percikan sedang aktif
-} Splash;
-
-static Splash splashes[SPLASH_COUNT];
+#define CLOUD_Y      (TOP - 220)
+#define SPLASH_LIFETIME 0.4f
 
 typedef struct {
     float x;
     float y;
     float speed;
-    float size;    // 0.7 (kecil) .. 1.3 (besar)
-    float targetY; // Batas jatuh dinamis (Dua Wilayah)
+    float size;
+    float targetY; // Per awan (Pendek vs Panjang)
 } Drop;
 
+typedef struct {
+    float x, y, timer, size;
+    bool active;
+} Splash;
+
 static Drop rain[RAIN_COUNT];
-
-static float GetRainLeft() {
-    // Cloud[1] berada lebih ke kiri (cloudStopX - 200)
-    return cloudStopX - 200.0f - 140.0f;  // Extra padding ke kiri
-}
-
-static float GetRainRight() {
-    // Cloud[0] berada paling kanan (cloudStopX)
-    return cloudStopX + 140.0f;  // Extra padding ke kanan
-}
+static Splash splashes[SPLASH_COUNT];
 
 static void ResetDrop(int i) {
-    // Posisi X menyebar merata di seluruh area kedua awan
-    float rainLeft = GetRainLeft();
-    float rainRight = GetRainRight();
-    float rainWidth = rainRight - rainLeft;
+    // Memilih antara Cloud 0 (Kanan) atau Cloud 1 (Kiri) agar penyebaran merata
+    int cloudIdx = i % 2; 
+    float spread = 120.0f;
     
-    float nx = rainLeft + (float)(rand() % (int)rainWidth);
-    rain[i].x     = nx;
-    rain[i].y     = CLOUD_Y - (rand() % 30);       // muncul sedikit di bawah awan
+    rain[i].x = mainClouds[cloudIdx].x + (rand() % (int)(spread * 2)) - spread;
+    
+    // Pastikan hujan tidak melebihi batas darat (X = 80.0f) agar tidak jatuh di tebing/laut
+    if (rain[i].x > 80.0f) {
+        rain[i].x = 80.0f - (rand() % 40);
+    }
+    
+    rain[i].y = mainClouds[cloudIdx].y - 20.0f - (rand() % 30);
     rain[i].speed = SPEED_MIN + (rand() % (int)(SPEED_MAX - SPEED_MIN));
-    rain[i].size  = 0.7f + (float)(rand() % 7) / 10.0f;
+    rain[i].size = 0.7f + (float)(rand() % 6) / 10.0f;
 
     // --- PEMBAGIAN DUA WILAYAH (Y target) ---
-    // Posisi ditukar sesuai permintaan: Kiri jadi panjang, Kanan jadi pendek
-    if (nx < cloudStopX - 100.0f) {
-        rain[i].targetY = BOTTOM + 230.0f; // Jalur Panjang (Target Rendah)
+    // Awan Pertama (Cloud 0, Kanan): Y lebih pendek (Target Tinggi)
+    // Awan Kedua (Cloud 1, Kiri): Y lebih panjang (Target Rendah)
+    if (cloudIdx == 1) {
+        rain[i].targetY = BOTTOM + 240.0f; // Jalur Panjang
     } else {
-        rain[i].targetY = BOTTOM + 330.0f; // Jalur Pendek (Target Tinggi)
+        rain[i].targetY = BOTTOM + 330.0f; // Jalur Pendek
     }
 }
 
-// Aktifkan percikan air di posisi tertentu
 static void SpawnSplash(float x, float y) {
     for (int i = 0; i < SPLASH_COUNT; i++) {
         if (!splashes[i].active) {
+            splashes[i].active = true;
             splashes[i].x = x;
             splashes[i].y = y;
             splashes[i].timer = 0.0f;
-            splashes[i].size = 4.0f + (float)(rand() % 6);  // Ukuran lebih besar
-            splashes[i].active = 1;
+            splashes[i].size = 4.0f + (rand() % 5);
             return;
         }
     }
@@ -90,45 +74,33 @@ static void SpawnSplash(float x, float y) {
 void InitRain() {
     for (int i = 0; i < RAIN_COUNT; i++) {
         ResetDrop(i);
-        // Sebar posisi awal vertikal secara acak
-        float range = CLOUD_Y - (BOTTOM + 330.0f);
-        rain[i].y   = CLOUD_Y - (rand() % (int)range);
+        // Sebar awal
+        rain[i].y = (float)(rand() % (int)(TOP - rain[i].targetY)) + rain[i].targetY;
     }
-    // Inisialisasi semua percikan sebagai tidak aktif
-    for (int i = 0; i < SPLASH_COUNT; i++) {
-        splashes[i].active = 0;
-    }
+    for (int i = 0; i < SPLASH_COUNT; i++) splashes[i].active = false;
 }
 
 void UpdateRain(float dt) {
-    // Dinamis: jumlah tetesan yang diproses sesuai tingginya angka penguapan
-    int activeRainCount = (int)(RAIN_COUNT * (evaporationRate / 2.0f));
-    if (activeRainCount > RAIN_COUNT) activeRainCount = RAIN_COUNT;
+    if (currentPhase != PHASE_PRECIPITATION && currentPhase != PHASE_INFILTR_COLLECT) return;
 
-    for (int i = 0; i < activeRainCount; i++) {
-
-        // Y berkurang = jatuh ke bawah (koordinat dunia nyata)
+    for (int i = 0; i < RAIN_COUNT; i++) {
         rain[i].y -= rain[i].speed * dt;
 
-        // Sampai "tanah" spesifik wilayahnya → spawn percikan + reset ke atas
         if (rain[i].y < rain[i].targetY) {
-            // Buat percikan air di lokasi tetesan jatuh (sesuai targetY partikel tersebut)
-            SpawnSplash(rain[i].x, rain[i].targetY);
+            if (rain[i].x < 80.0f) { // Efek daratan
+                SpawnSplash(rain[i].x, rain[i].targetY);
+            }
             ResetDrop(i);
         }
     }
 
-    // Update semua percikan yang aktif
     for (int i = 0; i < SPLASH_COUNT; i++) {
         if (splashes[i].active) {
             splashes[i].timer += dt;
-            if (splashes[i].timer >= SPLASH_LIFETIME) {
-                splashes[i].active = 0;
-            }
+            if (splashes[i].timer >= SPLASH_LIFETIME) splashes[i].active = false;
         }
     }
 }
-
 
 static void DrawDrop(float cx, float cy, float s) {
     Color fill    = (Color){ 80, 185, 220, 220};
@@ -180,8 +152,7 @@ static void DrawDrop(float cx, float cy, float s) {
     Wrapper_DrawCircleFilled(cx - r/3.0f, cy - r/3.0f, r * 0.3f, shine);
 }
 
-
-static void DrawSplash(Splash* sp) {
+static void DrawSplashEffect(Splash* sp) {
     if (!sp->active) return;
     
     // Progress animasi percikan (0.0 = baru muncul, 1.0 = selesai)
@@ -264,18 +235,13 @@ static void DrawSplash(Splash* sp) {
     }
 }
 
-
 void DrawRain() {
-    // Hitung ulang untuk sinkronisasi render
-    int activeRainCount = (int)(RAIN_COUNT * (evaporationRate / 2.0f));
-    if (activeRainCount > RAIN_COUNT) activeRainCount = RAIN_COUNT;
+    if (currentPhase != PHASE_PRECIPITATION && currentPhase != PHASE_INFILTR_COLLECT) return;
 
-    for (int i = 0; i < activeRainCount; i++) {
+    for (int i = 0; i < RAIN_COUNT; i++) {
         DrawDrop(rain[i].x, rain[i].y, rain[i].size);
     }
-    
-    // Gambar semua percikan yang aktif
     for (int i = 0; i < SPLASH_COUNT; i++) {
-        DrawSplash(&splashes[i]);
+        if (splashes[i].active) DrawSplashEffect(&splashes[i]);
     }
 }

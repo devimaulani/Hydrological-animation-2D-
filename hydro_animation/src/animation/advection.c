@@ -7,136 +7,112 @@
 // =========================
 // POSISI & KONTROL
 // =========================
-// Angin sedikit lebih cepat dari awan (70.0f) agar melintas mendahului
-#define WIND_SPEED 120.0f
+#define WIND_SPEED 220.0f  // Jauh lebih cepat dari awan (75.0f) untuk visual "dorongan" kuat
 
-// Posisi scroll angin - per siklus hanya satu kali melintas
 static float windScrollX = 0.0f;
+static bool windFinished = false;
 
-// Apakah angin sudah selesai melintas dalam siklus ini
-static int windFinished = 0;
-
-// =========================
 void InitAdvection() {
     windScrollX = 0.0f;
-    windFinished = 0;
+    windFinished = false;
 }
 
 void ResetAdvection() {
     windScrollX = 0.0f;
-    windFinished = 0;
+    windFinished = false;
 }
 
-// =========================
 void UpdateAdvection(float dt) {
-    if (currentPhase == PHASE_ADVECTION || currentPhase == PHASE_PRECIPITATION) {
+    if (currentPhase == PHASE_ADVECTION) {
         if (!windFinished) {
             windScrollX += WIND_SPEED * dt;
-            
-            // Angin hanya melintas sekali, kemudian berhenti sampai siklus baru
-            if (windScrollX > 1800.0f) {
-                windFinished = 1;
-            }
+            // Jika sudah melintasi seluruh layar (~1500 unit), tandai selesai
+            if (windScrollX > 1500.0f) windFinished = true;
         }
+    } else if (currentPhase == PHASE_INFILTR_COLLECT) {
+        // Angin akan berhembus kembali saat awan keluar (opsional, tapi bagus untuk dinamika)
+        windScrollX += WIND_SPEED * 0.8f * dt;
     }
 }
 
-// 🔥 DRAW SPIRAL (Pusaran Angin)
-// Menggambar pusaran melingkar di ujung angin menggunakan titik-titik parametrik
-static void DrawWindSpiral(float x, float y, float radius, float phaseShift, Color color) {
+// 🔥 DRAW NATURAL WIND (Wisp - Lebih Jelas & Cerah)
+static void DrawWindWisp(float baseX, float baseY, float length, float phaseShift) {
     float time = (float)GetTime();
-    int segments = 24;
-    // Rotasi spiral secara aktif
-    float rotation = time * 6.0f + phaseShift; 
+    int segments = 28;
+    float segmentLen = length / segments;
+
+    float currentBaseX = baseX - windScrollX;
     
-    // Denyut halus pada radius spiral
-    float pulseRadius = radius * (1.0f + 0.1f * sinf(time * 4.0f + phaseShift));
+    float headX = currentBaseX;
+    float headY = baseY + sinf(headX * 0.015f + time * 4.5f + phaseShift) * 15.0f;
 
-    float prevX = x + pulseRadius * cosf(rotation);
-    float prevY = y + pulseRadius * sinf(rotation);
-
-    for (int i = 1; i <= segments; i++) {
-        float t = (float)i / segments;
-        // Radius mengecil ke dalam untuk efek spiral
-        float r = pulseRadius * (1.1f - t * 0.95f);
-        // Sudut berputar (1.6 putaran)
-        float angle = rotation + (t * 6.28f * 1.6f);
+    // GAMBAR SPIRAL DI KEPALA ANGIN
+    float spiralPrevX = headX;
+    float spiralPrevY = headY;
+    float totalAngle = PI * 2.8f;
+    for (int i = 1; i <= 24; i++) {
+        float t = (float)i / 24.0f;
+        float r = 12.0f * (1.0f - t); 
+        float angle = t * totalAngle; 
         
-        float curX = x + r * cosf(angle);
-        float curY = y + r * sinf(angle);
-
-        // Alpha memudar ke ujung dalam spiral
-        Color stepCol = color;
-        stepCol.a = (unsigned char)(color.a * (1.0f - t * 0.6f));
+        // Pusat spiral ditaruh sedikit di depan (kiri) ujung badan angin
+        float centerX = headX - 12.0f;
+        float centerY = headY; 
         
-        Wrapper_DrawLineThick(prevX, prevY, curX, curY, 2, stepCol);
+        float sx = centerX + r * cosf(angle);
+        float sy = centerY + r * sinf(angle);
         
-        prevX = curX;
-        prevY = curY;
+        unsigned char alpha = (unsigned char)(220 * (1.0f - t));
+        Color col = (Color){ 255, 255, 255, alpha };
+        
+        if (isWireframeMode && applyWireframeColor) {
+            col = (Color){0, 255, 0, alpha};
+        }
+        
+        Wrapper_DrawLineThick(spiralPrevX, spiralPrevY, sx, sy, 2.0f, col);
+        spiralPrevX = sx;
+        spiralPrevY = sy;
     }
-}
 
-// 🔥 DRAW NATURAL WIND WISP
-// Menghasilkan tiupan angin dengan ekor meliuk dan pusaran spiral di depan
-static void DrawWindWisp(float cloudX, float relY, float length, float swirlRadius, float phaseShift) {
-    float time = (float)GetTime();
-    int tailSegments = 25;
-    float tailStep = length / tailSegments;
-
-    // Posisi angin: Memimpin di depan awan (cloudX adalah posisi awan utama)
-    float headX = cloudX - 120.0f - (windScrollX * 0.6f);
-    // Gerakan vertikal angin secara keseluruhan
-    float headY = relY + sinf(time * 1.5f + phaseShift) * 15.0f;
-
-    // 1. Gambar Pusaran (Spiral) Berotasi Aktif
-    unsigned char alpha = (unsigned char)(160 * (1.0f - (windScrollX / 1900.0f)));
-    if (windScrollX > 1900.0f) alpha = 0;
-    Color windCol = (Color){220, 235, 255, alpha};
-
-    DrawWindSpiral(headX, headY, swirlRadius, phaseShift, windCol);
-
-    // 2. Gambar Ekor (Tail) Meliuk Bergelombang (Wavy Flow)
+    // GAMBAR BADAN ANGIN (Gelombang)
     float prevX = headX;
     float prevY = headY;
 
-    for (int i = 1; i <= tailSegments; i++) {
-        float t = (float)i / tailSegments;
-        // Ekor memanjang ke arah berlawanan gerak
-        float x = headX + (i * tailStep);
+    for (int i = 0; i < segments; i++) {
+        float t = (float)i / segments;
+        float x = currentBaseX - (i * segmentLen);
         
-        // Gelombang yang merambat (propagating wave) dari kepala ke ekor
-        float waveAmplitude = 18.0f * (1.0f - t * 0.4f);
-        float wavePhase = x * 0.025f - time * 6.0f + phaseShift;
-        float y = headY + sinf(wavePhase) * waveAmplitude;
+        float wave = sinf(x * 0.015f + time * 4.5f + phaseShift) * 15.0f;
+        float y = baseY + wave;
 
-        Color stepCol = windCol;
-        stepCol.a = (unsigned char)(alpha * (0.9f - t * 0.8f));
+        // Peningkatan Visibilitas (Putih Terang dengan Alpha lebih tinggi)
+        unsigned char alpha = (unsigned char)(220 * (1.0f - t));
+        Color col = (Color){ 255, 255, 255, alpha }; 
 
-        Wrapper_DrawLineThick(prevX, prevY, x, y, 2, stepCol);
-        
+        if (i > 0) {
+            // Tebal 2 -> lebih jelas
+            if (isWireframeMode && applyWireframeColor) col = (Color){0, 255, 0, alpha};
+            Wrapper_DrawLineThick(prevX, prevY, x, y, 2.0f, col);
+        }
+
         prevX = x;
         prevY = y;
     }
 }
 
-// 🔥 DRAW FINAL
 void DrawAdvection() {
-    if (currentPhase != PHASE_ADVECTION && currentPhase != PHASE_PRECIPITATION) return;
-    if (windFinished) return;
+    // Gambar angin selama fase Adveksi atau saat awan mulai keluar (koleksi)
+    if (currentPhase != PHASE_ADVECTION && currentPhase != PHASE_INFILTR_COLLECT) return;
+    if (windFinished && currentPhase == PHASE_ADVECTION) return;
 
-    // Mendapatkan posisi awan laut untuk sinkronisasi dorongan
-    // Angin bervariasi ukuran dan posisinya mengikuti awan dominan
-    float cx = (mainClouds[0].x < 1500) ? mainClouds[0].x : RIGHT;
-
-    // Beberapa tiupan angin bervariasi (Besar, Kecil, Panjang, Pendek)
-    DrawWindWisp(cx, TOP - 80.0f,  300.0f, 15.0f, 0.0f);   // Utama
-    DrawWindWisp(cx, TOP - 140.0f, 400.0f, 12.0f, 1.5f);  // Lebih panjang, spiral kecil
-    DrawWindWisp(cx, TOP - 200.0f, 250.0f, 20.0f, 3.2f);  // Pendek, spiral besar
-    DrawWindWisp(cx, TOP - 50.0f,  350.0f, 10.0f, 4.8f);  // Tipis di atas
-    DrawWindWisp(cx, TOP - 260.0f, 320.0f, 14.0f, 6.1f);  // Di bawah
+    // Gambar 4 lapisan angin yang mendahului awan
+    DrawWindWisp(RIGHT + 300.0f, TOP - 100.0f, 400.0f, 0.0f);
+    DrawWindWisp(RIGHT + 600.0f, TOP - 150.0f, 500.0f, 2.0f);
+    DrawWindWisp(RIGHT + 200.0f, TOP - 200.0f, 450.0f, 4.0f);
+    DrawWindWisp(RIGHT + 500.0f, TOP - 250.0f, 420.0f, 6.0f);
 }
 
-// 🔥 IsWindReachedLand (Status angin)
 int IsWindReachedLand() {
-    return currentPhase == PHASE_ADVECTION || currentPhase == PHASE_PRECIPITATION;
+    // Status angin untuk logika mendung
+    return (currentPhase == PHASE_ADVECTION && windScrollX > 400.0f);
 }

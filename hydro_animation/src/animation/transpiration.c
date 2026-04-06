@@ -35,7 +35,7 @@ void InitTranspiration() {
 void UpdateTranspiration(float dt) {
     for (int i = 0; i < COUNT; i++) {
 
-        t[i].y += BASE_SPEED * transpirationRate * sunIntensity * dt;
+        t[i].y += BASE_SPEED * evaporationSpeedMult * transpirationRate * sunIntensity * dt;
 
         if (t[i].y > CLOUD_Y) {
             t[i].y = BASE_Y;

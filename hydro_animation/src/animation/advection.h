@@ -6,7 +6,7 @@ void ResetAdvection();
 void UpdateAdvection(float dt);
 void DrawAdvection();
 
-// 🔥 status angin sudah sampai darat
+// status angin sudah sampai darat
 int IsWindReachedLand();
 
 #endif
