@@ -29,6 +29,9 @@ extern Cloud mainClouds[2];
 extern float evaporationRate;
 extern float transpirationRate;
 extern float sunIntensity;
+extern float evaporationSpeedMult;
+extern bool isWireframeMode;
+extern bool applyWireframeColor;
 
 // hasil (dipakai cloud)
 extern float cloudDensity;
