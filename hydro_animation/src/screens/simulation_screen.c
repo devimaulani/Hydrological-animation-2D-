@@ -19,14 +19,18 @@
 #include "../animation/infiltration.h"
 #include "../animation/collection.h"
 #include "../objects/birds.h"
+#include "../objects/star.h"
 #include "../controls/slider.h"
 #include "../ui/button.h"
 #include "../../screen_type.h"
+#include "../objects/logo_polban.h"
 #include "coords.h"
 #include <stdlib.h>
 #include <math.h>
 
-static Button btnBackSim;
+static Button       btnBackSim;
+static Button       btnWireframe;
+static SliderScreen sliderEvap;   /* Slider pengatur kecepatan penguapan */
 
 // Modular Textures (Baking)
 static RenderTexture2D texMountain;
@@ -41,11 +45,16 @@ static void BakeModularTextures() {
     int oldOX = G_OriginX;
     int oldOY = G_OriginY;
 
+    // Pastikan warna override diaktifkan saat baking jika wireframe mode menyala
+    if (isWireframeMode) applyWireframeColor = true;
+
     // 1. Bake Mountains
     texMountain = LoadRenderTexture(SCREEN_W, SCREEN_H);
     BeginTextureMode(texMountain);
         ClearBackground(BLANK);
         DrawMountain();
+        // Gambar Logo Polban di atas gunung (-300, 150) relatif dari origin
+        DrawLogoPolban(-300.0f, (float)((-HALF_H / 4.2f) - 5) + 150.0f, 1.2f);
     EndTextureMode();
 
     // 2. Bake Land
@@ -88,6 +97,10 @@ static void BakeModularTextures() {
     // Restore Origins
     G_OriginX = oldOX;
     G_OriginY = oldOY;
+    
+    // Kembalikan status warna ke false jika kita selesai baking
+    if (isWireframeMode) applyWireframeColor = false;
+    
     texturesLoaded = true;
 }
 
@@ -110,8 +123,27 @@ void InitSimulation() {
     InitInfiltration();
     InitCollection();
     InitBirds();
+    /* Area langit = dari atas layar (y=0) sampai G_OriginY (tengah layar = horizon kasar).
+       Bintang hanya muncul di bagian atas layar, tidak masuk ke daratan. */
+    InitStars(SCREEN_W, G_OriginY);
     BakeModularTextures();
     btnBackSim = CreateButton(20, 20, 150, 40, "Menu Utama");
+
+    /*
+     * Slider penguapan — pojok kanan bawah area laut (layar).
+     * SCREEN_W = 1400, SCREEN_H = 900. Panel 200x90 px.
+     * Ditempatkan 12px dari tepi kanan dan 12px dari tepi bawah layar.
+     */
+    float sliderPanelW = 200.0f;
+    float sliderPanelH =  90.0f;
+    float sliderX = (float)SCREEN_W - sliderPanelW - 12.0f;  /* 1188 */
+    float sliderY = (float)SCREEN_H - sliderPanelH - 12.0f;  /* 798  */
+    InitSliderScreen(&sliderEvap, sliderX, sliderY,
+                     sliderPanelW, sliderPanelH,
+                     0.5f, 4.0f, 1.0f);  /* range 0.5x - 4x, default 1x */
+
+    // Tombol Wireframe digeser lebih jauh ke kiri agar tidak menabrak
+    btnWireframe = CreateButton(sliderX - 180.0f, sliderY, 140, 40, "Wireframe");
 }
 
 static void DrawBakedTexture(RenderTexture2D tex, Color tint) {
@@ -149,8 +181,27 @@ void DrawSimulation() {
     float dt = GetFrameTime();
     UpdateSimulationState(dt);
 
-    // Langit dengan transisi bertahap (tidak tiba-tiba berubah)
-    DrawSkyGradual(skyDarkness);
+    // Langit dengan transisi bertahap atau layar gelap untuk mode wireframe
+    if (isWireframeMode) {
+        ClearBackground((Color){10, 12, 18, 255}); // Latar gelap "hacker"
+        
+        // Gambar WIREFRAME GRID (Langit) - jaring hijau gelap di belakang segalanya
+        for (int x = 0; x < SCREEN_W; x += 60) {
+            DrawLine(x, 0, x, SCREEN_H, (Color){0, 100, 0, 90});
+        }
+        for (int y = 0; y < SCREEN_H; y += 60) {
+            DrawLine(0, y, SCREEN_W, y, (Color){0, 100, 0, 90});
+        }
+        
+        applyWireframeColor = true;
+    } else {
+        DrawSkyGradual(skyDarkness);
+        applyWireframeColor = false;
+    }
+
+    // Bintang kerlap-kerlip: muncul saat langit gelap, memudar saat terang
+    UpdateStars(dt, skyDarkness);
+    DrawStars();
     
     // Matahari dinamis dengan smooth fade out saat langit gelap
     DrawSun(sunX, sunY, 45, 1.0f - skyDarkness);
@@ -246,6 +297,9 @@ void DrawSimulation() {
     UpdateBirds(dt);
     DrawBirds();
 
+    // Pastikan warna UI (tombol, slider, label) tidak terpengaruh efek warna hijau wireframe
+    applyWireframeColor = false;
+
     // INTERACTION & EDUCATIONAL LABELS
     Vector2 m = GetMousePosition();
     float mouseX = (m.x - (float)G_OriginX) / G_TickStep;
@@ -284,4 +338,17 @@ void DrawSimulation() {
         UnloadSimulationTextures();
         currentScreen = MENU_SCREEN;
     }
+
+    if (DrawButton(&btnWireframe)) {
+        isWireframeMode = !isWireframeMode;
+        // Unload textures agar di-*bake* ulang dengan mode kerangka (wireframe)
+        UnloadSimulationTextures();
+    }
+
+    /*
+     * Slider kecepatan penguapan — selalu tampil di pojok kanan bawah.
+     */
+    UpdateSliderScreen(&sliderEvap);
+    evaporationSpeedMult = sliderEvap.value;
+    DrawSliderScreen(&sliderEvap, "Kec. Penguapan");
 }
