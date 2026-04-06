@@ -1,9 +1,11 @@
 #include "draw_rectangle.h"
 #include "../../src/algo/bresenham.h"
 #include "../../src/algo/midcircle.h"
+#include "../simulation/simulation_state.h"
 
 void Wrapper_DrawRectangleOutline(int x, int y, int width, int height, int thickness, Color color) {
     if (width <= 0 || height <= 0) return;
+    if (isWireframeMode && applyWireframeColor) { color.r = 0; color.g = 255; color.b = 0; }
     
     // Top
     Bres_ThickLine(x, y, x + width, y, thickness, color);
@@ -18,6 +20,11 @@ void Wrapper_DrawRectangleOutline(int x, int y, int width, int height, int thick
 void Wrapper_DrawRectangleFilled(int x, int y, int width, int height, Color color) {
     if (width <= 0 || height <= 0) return;
     
+    if (isWireframeMode) {
+        Wrapper_DrawRectangleOutline(x, y, width, height, 1, color);
+        return;
+    }
+
     // FAST SCANLINE: Linear horizontal fill (Much faster than Bresenham for axis-aligned)
     for (int j = 0; j < height; j++) {
         int py = y + j;
@@ -31,6 +38,12 @@ void Wrapper_DrawRectangleRounded(int x, int y, int width, int height, int radiu
     if (width <= 0 || height <= 0) return;
     if (radius <= 0) {
         Wrapper_DrawRectangleFilled(x, y, width, height, color);
+        return;
+    }
+
+    if (isWireframeMode) {
+        Wrapper_DrawRectangleOutline(x, y, width, height, 1, color);
+        // Rounded wireframe is hard, just use basic outline for wireframe
         return;
     }
 
