@@ -8,7 +8,7 @@ SRCS = main.c coords.c \
        src/ui/button.c src/objects/sky.c src/objects/sun.c src/objects/mountain.c \
        src/objects/water.c src/objects/tree.c src/objects/land.c src/objects/cloud.c \
        src/objects/lake.c src/objects/rock.c src/objects/grass.c src/objects/flower.c \
-       src/objects/birds.c \
+       src/objects/birds.c src/objects/star.c src/objects/logo_polban.c \
        src/animation/evaporation.c src/animation/transpiration.c \
        src/animation/advection.c src/animation/precipitation.c \
        src/animation/infiltration.c src/animation/collection.c \

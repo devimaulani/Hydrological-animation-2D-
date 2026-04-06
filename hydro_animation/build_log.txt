@@ -1,0 +1,33 @@
+﻿C:/raylib/w64devkit/bin/gcc.ex
+e : src/screens/simulation_scr
+een.c: In function 
+'BakeModularTextures':
+At line:1 char:1
++ C:/raylib/w64devkit/bin/gcc.
+exe -I. 
+-IC:/raylib/raylib/src -Wall 
+-c s ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (src/scree  
+  ns/sim...dularTextures'::   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+src/screens/simulation_screen.
+c:63:9: error: too few 
+arguments to function 
+'DrawLake'
+   63 |         DrawLake();
+      |         ^~~~~~~~
+In file included from src/scre
+ens/simulation_screen.c:10:
+src/screens/../objects/lake.h:
+22:6: note: declared here
+   22 | void DrawLake(float 
+overflow);
+      |      ^~~~~~~~
